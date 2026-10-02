@@ -6,7 +6,7 @@ Tampermonkey userscript for exporting Tencent Meeting public-share pages to read
 
 ## 项目介绍
 
-脚本适用于腾讯会议公开分享页（`/cw/...`），可以导出：
+脚本适用于腾讯会议公开分享页（`/cw/...` 和 `/ct/...`），可以导出：
 
 - AI 会议纪要
 - 待办事项
@@ -19,6 +19,7 @@ Tampermonkey userscript for exporting Tencent Meeting public-share pages to read
 ## 功能
 
 - 自动从当前腾讯会议分享页读取会议标题、开始时间和会议时长。
+- 同时支持腾讯会议的 `/cw/...` 分享页和 `/ct/...` 转写/录制详情页。
 - 遍历逐字稿的全部分页，兼容 paragraph → sentence 层级，并统计最终 transcript entry 数量。
 - 要求分页明确以 `more=false` 结束，并检查 cursor 是否正常推进。
 - 任意中间页失败、分页状态缺失或响应 schema 不符合预期时，逐字稿会被标记为不完整。
@@ -40,11 +41,11 @@ Tampermonkey userscript for exporting Tencent Meeting public-share pages to read
 4. Tampermonkey 应自动进入安装页面。
 5. 确认安装并返回腾讯会议分享页。
 
-脚本包含 Tampermonkey metadata header，并使用 `@match https://meeting.tencent.com/cw/*` 匹配腾讯会议公开分享页。当前版本没有配置 `@updateURL` 或 `@downloadURL`；可从仓库 Raw 地址手动更新。
+脚本包含 Tampermonkey metadata header，并使用 `@match https://meeting.tencent.com/cw/*` 与 `@match https://meeting.tencent.com/ct/*` 匹配腾讯会议公开分享页。当前版本没有配置 `@updateURL` 或 `@downloadURL`；可从仓库 Raw 地址手动更新。
 
 ## 使用方法
 
-1. 正常打开一个你本身有权限查看的腾讯会议分享页面，例如 `https://meeting.tencent.com/cw/...`。
+1. 正常打开一个你本身有权限查看的腾讯会议分享页面，例如 `https://meeting.tencent.com/cw/...` 或 `https://meeting.tencent.com/ct/...`。
 2. 等待页面加载完成，页面中会出现 **导出会议** 按钮。
 3. 点击按钮，选择要导出的内容：AI 纪要和待办、完整逐字稿、Raw JSON，以及是否分别保存纪要和逐字稿。
 4. 点击开始导出，浏览器会下载 Markdown 文件；如果选择了 Raw JSON，也会下载对应的 JSON 文件。
@@ -107,7 +108,7 @@ Tampermonkey userscript for exporting Tencent Meeting public-share pages to read
 ## 已知限制
 
 - 腾讯会议网页或 Web API 可能更新，导致当前脚本暂时失效或进入 INCOMPLETE 状态。
-- 当前脚本只适配明确支持的腾讯会议公开分享页面 `/cw/*`。
+- 当前脚本只适配明确支持的腾讯会议公开分享页面 `/cw/*` 和 `/ct/*`。
 - 需要用户本身拥有正常访问权限；脚本不提供登录、密码、验证码或权限绕过能力。
 - Raw JSON 是为当前页面结构提供的调试输出，不承诺跨版本 schema 永久稳定。
 - 浏览器对同名下载文件的最终命名行为可能因浏览器设置而不同；脚本每次导出都会使用新的候选文件名，避免主动静默覆盖。

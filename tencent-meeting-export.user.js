@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         Tencent Meeting Local Export
 // @namespace    local.tencent-meeting-export
-// @version      0.1.0
+// @version      0.2.0
 // @description  Export the current Tencent Meeting public-share transcript and minutes locally.
 // @match        https://meeting.tencent.com/cw/*
+// @match        https://meeting.tencent.com/ct/*
 // @grant        none
 // @run-at       document-idle
 // @noframes
@@ -14,9 +15,10 @@
 
   /*
    * These paths and response shapes are the current Web API used by
-   * Tencent Meeting's public share page. They are not a versioned public
-   * SDK; Tencent may change them when the page is updated. The parser is
-   * intentionally strict so a schema change is reported as incomplete.
+   * Tencent Meeting's /cw and /ct public share pages. They are not a
+   * versioned public SDK; Tencent may change them when the page is updated.
+   * The parser is intentionally strict so a schema change is reported as
+   * incomplete.
    */
   const MINUTES_DETAIL_PATH = "/wemeet-cloudrecording-webapi/v1/minutes/detail";
   const SUMMARY_PATH = "/wemeet-tapi/v2/meetlog/public/record-detail/get-mul-summary-and-todo";
@@ -166,6 +168,20 @@
     return match ? decodeURIComponent(match[1]) : "";
   }
 
+  function isSupportedSharePath(pathname) {
+    return typeof pathname === "string" && (pathname.startsWith("/cw/") || pathname.startsWith("/ct/"));
+  }
+
+  function shortUrlCodeFromValue(value) {
+    try {
+      const parsed = new URL(value || "", "https://meeting.tencent.com");
+      const match = /^\/(?:cw|ct)\/([^/?#]+)/.exec(parsed.pathname);
+      return match ? decodeURIComponent(match[1]) : "";
+    } catch (_) {
+      return "";
+    }
+  }
+
   function parseSharePage(html, sourceUrl) {
     const serverData = extractEmbeddedObject(html, "serverData");
     if (serverData.code !== 0 && serverData.code !== "0") {
@@ -182,7 +198,7 @@
       throw new ApiError("分享页 recordings schema 无效");
     }
     const meetingId = String(meetingInfo.meeting_id || serverData.meeting_id || "");
-    const recordingId = String(recording.id || "");
+    const recordingId = String(recording.id || recording.recording_id || recording.record_id || "");
     if (!meetingId || !recordingId) throw new ApiError("分享页缺少 meeting_id 或 recording_id");
 
     const startValue = meetingInfo.start_time ?? recording.start_time;
@@ -193,6 +209,7 @@
     const longUrl = longUrlInfo && typeof longUrlInfo === "object"
       ? longUrlInfo.long_url
       : extractEmbeddedString(html, "fullLongUrlSearch");
+    const shareId = shareIdFromValue(longUrl) || String(serverData.sharing_id || recording.sharing_id || "");
 
     return {
       subject: decodeSubject(meetingInfo.subject || serverData.subject),
@@ -200,7 +217,8 @@
       durationMs,
       meetingId,
       recordingId,
-      shareId: shareIdFromValue(longUrl),
+      shareId,
+      shortUrlCode: shortUrlCodeFromValue(sourceUrl),
       sourceUrl: sourceUrl || ""
     };
   }
@@ -345,10 +363,10 @@
     const params = {
       meeting_id: meta.meetingId,
       recording_id: meta.recordingId,
-      share_id: "",
+      share_id: meta.recordingId ? "" : (meta.shareId || ""),
       is_single: "true",
       is_meetlog: "false",
-      short_url_code: "",
+      short_url_code: meta.recordingId ? "" : (meta.shortUrlCode || ""),
       lang: "zh",
       minutes_version: "1",
       limit: String(MINUTES_PAGE_LIMIT),
@@ -685,6 +703,7 @@
   const USERSCRIPT_METADATA = [
     "// ==UserScript==",
     "// @match        https://meeting.tencent.com/cw/*",
+    "// @match        https://meeting.tencent.com/ct/*",
     "// @grant        none",
     "// @run-at       document-idle",
     "// ==/UserScript=="
@@ -995,6 +1014,8 @@
     SUMMARY_PATH,
     MINUTES_PAGE_LIMIT,
     parseSharePage,
+    isSupportedSharePath,
+    shortUrlCodeFromValue,
     parseMinutesPage,
     sentenceText,
     flattenParagraphs,
@@ -1026,10 +1047,9 @@
     globalObject.TencentMeetingExportCore = CORE;
   }
 
-  // The browser UI is added in later execution-plan tasks. Keeping the pure
-  // core available without bootstrapping on local test files makes the Edge
-  // harness deterministic and avoids touching unrelated pages.
+  // Keep the pure core available without bootstrapping on local test files;
+  // the UI is only installed on supported Tencent Meeting share pages.
   if (typeof document === "undefined" || typeof location === "undefined") return;
-  if (location.hostname !== "meeting.tencent.com" || !location.pathname.startsWith("/cw/")) return;
+  if (location.hostname !== "meeting.tencent.com" || !isSupportedSharePath(location.pathname)) return;
   bootPageUI();
 })();
